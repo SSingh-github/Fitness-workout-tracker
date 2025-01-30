@@ -29,3 +29,21 @@ def signup():
                         str(os.getenv('SECRET_KEY')), algorithm='HS256')
     
     return jsonify({'message': 'User created successfully', 'token': token}), 200
+
+
+@main_blueprint.route('/users/login', methods=['POST'])
+def login():
+    data = request.get_json()
+    email = data.get('email')
+    password = data.get('password')
+    
+    user = users_collection.find_one({'email': email})
+    
+    if not user or not check_password_hash(user['password'], password):
+        return jsonify({'message': 'Invalid email or password'}), 401
+    
+    token = jwt.encode({'id': str(user['_id']), 'email': email, 
+                        'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=24)}, 
+                        str(os.getenv('SECRET_KEY')), algorithm='HS256')
+    
+    return jsonify({'message': 'Login successful', 'token': token}), 200
