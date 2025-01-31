@@ -2,6 +2,8 @@ from functools import wraps
 from flask import request, jsonify, g
 import jwt
 import os
+from . import users_collection
+from bson import ObjectId
 
 def decode_token(token):
     """Helper function to decode a JWT token."""
@@ -14,7 +16,7 @@ def decode_token(token):
     except jwt.InvalidTokenError:
         return None
 
-def merchant_required(f):
+def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         auth_header = request.headers.get("Authorization")
@@ -28,7 +30,13 @@ def merchant_required(f):
         if not decoded_token:
             return jsonify({"message": "Invalid or expired token"}), 401
         
-        g.user_id = decoded_token.get("id")
+        user_id = decoded_token.get("id")
+        user = users_collection.find_one({"_id": ObjectId(user_id)})
+        
+        if not user:
+            return jsonify({"message": "User not found"}), 401
+        
+        g.user_id = user_id
         return f(*args, **kwargs)
 
     return decorated

@@ -1,10 +1,13 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, g
 import datetime
 import jwt
-from . import users_collection
+from . import users_collection, exercise_collection
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
-from .models import User
+from .models import User, Exercise
+from .utils import token_required
+from bson import ObjectId
+
 
 main_blueprint = Blueprint('main', __name__)
 
@@ -47,3 +50,66 @@ def login():
                         str(os.getenv('SECRET_KEY')), algorithm='HS256')
     
     return jsonify({'message': 'Login successful', 'token': token}), 200
+
+
+@main_blueprint.route('/exercise/create', methods=['POST'])
+@token_required
+def create_exercise():
+    data = request.get_json()
+    name = data.get('name')
+    duration = data.get('duration')
+    description = data.get('description')
+    user_id = g.user_id
+    
+    if not name or not duration:
+        return jsonify({'message': 'Name and duration are required'}), 400
+    
+    exercise = Exercise(name, duration, description, user_id)
+    inserted_exercise = exercise_collection.insert_one(exercise.to_dict())
+    return jsonify({'message': 'Exercise created', 'exercise_id': str(inserted_exercise.inserted_id)}), 201
+
+@main_blueprint.route('/exercise/update/<string:id>', methods=['PUT'])
+@token_required
+def update_exercise(id):
+    data = request.get_json()
+    user_id = g.user_id
+    
+    exercise = exercise_collection.find_one({'_id': ObjectId(id), 'user_id': ObjectId(user_id)})
+    if not exercise:
+        return jsonify({'message': 'Exercise not found'}), 404
+    
+    update_fields = {}
+    if 'name' in data:
+        update_fields['name'] = data['name']
+    if 'duration' in data:
+        update_fields['duration'] = data['duration']
+    if 'description' in data:
+        update_fields['description'] = data['description']
+    
+    if update_fields:
+        exercise_collection.update_one({'_id': ObjectId(id)}, {'$set': update_fields})
+    
+    return jsonify({'message': 'Exercise updated successfully'}), 200
+
+@main_blueprint.route('/exercise/list', methods=['GET'])
+@token_required
+def get_exercises():
+    user_id = g.user_id
+    exercises = list(exercise_collection.find({'user_id': ObjectId(user_id)}))
+    
+    for exercise in exercises:
+        exercise['_id'] = str(exercise['_id'])
+    
+    return jsonify({'exercises': exercises}), 200
+
+@main_blueprint.route('/exercise/delete/<string:id>', methods=['DELETE'])
+@token_required
+def delete_exercise(id):
+    user_id = g.user_id
+    
+    exercise = exercise_collection.find_one({'_id': ObjectId(id), 'user_id': ObjectId(user_id)})
+    if not exercise:
+        return jsonify({'message': 'Exercise not found'}), 404
+    
+    exercise_collection.delete_one({'_id': ObjectId(id)})
+    return jsonify({'message': 'Exercise deleted successfully'}), 200

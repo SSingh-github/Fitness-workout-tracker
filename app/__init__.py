@@ -9,6 +9,7 @@ uri = os.getenv("MONGO_URI")
 client = MongoClient(uri, server_api=ServerApi('1'))
 db = client['FitnessTracker']
 users_collection = db['users']
+exercise_collection = db['exercises']
 
 def create_app():
     app = Flask(__name__)
