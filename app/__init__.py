@@ -10,6 +10,8 @@ client = MongoClient(uri, server_api=ServerApi('1'))
 db = client['FitnessTracker']
 users_collection = db['users']
 exercise_collection = db['exercises']
+workout_collection = db['workouts']
+comment_collection = db['comments']
 
 def create_app():
     app = Flask(__name__)
